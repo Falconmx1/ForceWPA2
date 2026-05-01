@@ -1,0 +1,71 @@
+version: '3.8'
+
+services:
+  # Servicio principal (web + API)
+  forcewpa2-web:
+    build: .
+    container_name: forcewpa2-web
+    privileged: true  # Necesario para modo monitor
+    network_mode: host  # Para acceso directo a interfaces de red
+    volumes:
+      - ./data:/app/data
+      - ./logs:/app/logs
+      - ./wordlists:/app/wordlists
+      - ./notifications_config.json:/app/notifications_config.json
+    environment:
+      - FLASK_ENV=production
+      - NOTIFY_WEBHOOK=${NOTIFY_WEBHOOK:-}
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN:-}
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # Worker distribuido (opcional)
+  forcewpa2-worker:
+    build: .
+    container_name: forcewpa2-worker
+    privileged: true
+    network_mode: host
+    volumes:
+      - ./data:/app/data
+      - ./logs:/app/logs
+    environment:
+      - WORKER_MODE=true
+      - MASTER_HOST=${MASTER_HOST:-localhost}
+    command: python3 distributed_worker.py ${MASTER_HOST:-localhost}
+    restart: unless-stopped
+    deploy:
+      replicas: ${WORKER_COUNT:-1}
+    depends_on:
+      - forcewpa2-web
+
+  # Redis para caché y colas (modo distribuido)
+  redis:
+    image: redis:7-alpine
+    container_name: forcewpa2-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+
+  # PostgreSQL para persistencia de resultados
+  postgres:
+    image: postgres:15-alpine
+    container_name: forcewpa2-db
+    environment:
+      POSTGRES_DB: forcewpa2
+      POSTGRES_USER: forcewpa2
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-forcewpa2_secret}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    restart: unless-stopped
+
+volumes:
+  redis_data:
+  postgres_data:
