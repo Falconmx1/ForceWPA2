@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ForceWPA2 - Web Interface</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://cdn.socket.io/4.5.0/socket.io.min.js"></script>
+    <style>
+        body { background: #1a1a2e; color: #eee; }
+        .navbar { background: #16213e; }
+        .card { background: #0f3460; border: none; border-radius: 10px; }
+        .btn-primary { background: #e94560; border: none; }
+        .btn-primary:hover { background: #c72a48; }
+        .status-badge { position: fixed; top: 20px; right: 20px; }
+        pre { background: #1a1a2e; color: #0f0; padding: 10px; border-radius: 5px; }
+    </style>
+</head>
+<body>
+    <nav class="navbar navbar-dark">
+        <div class="container">
+            <span class="navbar-brand h1">🔓 ForceWPA2 Pro</span>
+            <div class="status-badge">
+                <span class="badge bg-success" id="connectionStatus">🟢 Conectado</span>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mt-4">
+        <div class="row">
+            <div class="col-md-8">
+                <div class="card">
+                    <div class="card-body">
+                        <h5 class="card-title">📡 Escáner WiFi</h5>
+                        <div class="input-group mb-3">
+                            <input type="text" class="form-control" id="interface" placeholder="Interfaz (ej: wlan0)" value="wlan0">
+                            <button class="btn btn-primary" onclick="scanNetworks()">Escanear</button>
+                        </div>
+                        <div id="scanResults"></div>
+                    </div>
+                </div>
+
+                <div class="card mt-3">
+                    <div class="card-body">
+                        <h5 class="card-title">🎯 Nuevo Ataque</h5>
+                        <form id="attackForm">
+                            <div class="mb-2">
+                                <label>BSSID</label>
+                                <input type="text" class="form-control" id="targetBSSID" required>
+                            </div>
+                            <div class="mb-2">
+                                <label>ESSID</label>
+                                <input type="text" class="form-control" id="targetESSID" required>
+                            </div>
+                            <div class="mb-2">
+                                <label>Canal</label>
+                                <input type="text" class="form-control" id="targetChannel">
+                            </div>
+                            <div class="mb-2">
+                                <label>Modo</label>
+                                <select class="form-control" id="attackMode">
+                                    <option value="wordlist">Diccionario (rockyou.txt)</option>
+                                    <option value="gpu">GPU (hashcat)</option>
+                                    <option value="mask">Máscara</option>
+                                    <option value="wps">WPS</option>
+                                </select>
+                            </div>
+                            <button type="submit" class="btn btn-primary w-100">Iniciar Ataque</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-4">
+                <div class="card">
+                    <div class="card-body">
+                        <h5 class="card-title">📊 Estadísticas</h5>
+                        <div id="stats">
+                            <p><strong>Ataques totales:</strong> <span id="totalAttacks">0</span></p>
+                            <p><strong>Ataques activos:</strong> <span id="activeAttacks">0</span></p>
+                            <p><strong>Tasa de éxito:</strong> <span id="successRate">0%</span></p>
+                            <p><strong>GPU:</strong> <span id="gpuStatus">Desconocido</span></p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card mt-3">
+                    <div class="card-body">
+                        <h5 class="card-title">🔑 Generador Wordlist</h5>
+                        <input type="text" class="form-control mb-2" id="essidForWordlist" placeholder="ESSID">
+                        <button class="btn btn-secondary w-100" onclick="generateWordlist()">Generar</button>
+                        <div id="wordlistResult" class="mt-2"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card mt-3">
+            <div class="card-body">
+                <h5 class="card-title">📜 Log de Ataques</h5>
+                <div id="attackLog" style="max-height: 300px; overflow-y: auto;">
+                    <pre id="logContent"></pre>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const socket = io();
+        let currentAttacks = {};
+
+        socket.on('connect', () => {
+            console.log('Conectado al servidor');
+            document.getElementById('connectionStatus').innerHTML = '🟢 Conectado';
+            loadStats();
+        });
+
+        socket.on('scan_complete', (data) => {
+            let html = '<h6>Redes encontradas:</h6><ul class="list-group">';
+            data.networks.forEach(net => {
+                html += `<li class="list-group-item bg-dark text-light">
+                            <strong>${net.essid}</strong> - ${net.bssid} (Canal ${net.channel})
+                            <button class="btn btn-sm btn-primary float-end" onclick="selectTarget('${net.bssid}', '${net.essid}', '${net.channel}')">Seleccionar</button>
+                         </li>`;
+            });
+            html += '</ul>';
+            document.getElementById('scanResults').innerHTML = html;
+        });
+
+        socket.on('attack_update', (data) => {
+            addLog(`[${data.attack_id}] ${data.message}`);
+            currentAttacks[data.attack_id] = data;
+        });
+
+        socket.on('attack_complete', (data) => {
+            addLog(`[${data.attack_id}] ✅ COMPLETADO - Contraseña: ${data.password}`);
+            loadStats();
+        });
+
+        function scanNetworks() {
+            const interface = document.getElementById('interface').value;
+            fetch('/api/scan', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({interface: interface})
+            });
+            addLog(`Iniciando escaneo en ${interface}...`);
+        }
+
+        function selectTarget(bssid, essid, channel) {
+            document.getElementById('targetBSSID').value = bssid;
+            document.getElementById('targetESSID').value = essid;
+            document.getElementById('targetChannel').value = channel;
+            addLog(`Objetivo seleccionado: ${essid} (${bssid})`);
+        }
+
+        document.getElementById('attackForm').onsubmit = async (e) => {
+            e.preventDefault();
+            const data = {
+                bssid: document.getElementById('targetBSSID').value,
+                essid: document.getElementById('targetESSID').value,
+                channel: document.getElementById('targetChannel').value,
+                mode: document.getElementById('attackMode').value
+            };
+            
+            const response = await fetch('/api/attack/start', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(data)
+            });
+            const result = await response.json();
+            addLog(`Ataque iniciado: ${result.attack_id}`);
+            loadStats();
+        };
+
+        async function generateWordlist() {
+            const essid = document.getElementById('essidForWordlist').value;
+            if (!essid) {
+                alert('Ingresa un ESSID');
+                return;
+            }
+            
+            const response = await fetch('/api/wordlist/generate', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({essid: essid})
+            });
+            const result = await response.json();
+            document.getElementById('wordlistResult').innerHTML = `
+                <div class="alert alert-success">
+                    Wordlist generada: ${result.count} contraseñas<br>
+                    <a href="${result.download_url}" class="btn btn-sm btn-success mt-2">Descargar</a>
+                </div>
+            `;
+        }
+
+        async function loadStats() {
+            const response = await fetch('/api/stats');
+            const stats = await response.json();
+            document.getElementById('totalAttacks').innerText = stats.total_attacks;
+            document.getElementById('activeAttacks').innerText = stats.active_attacks;
+            document.getElementById('successRate').innerText = stats.success_rate;
+            document.getElementById('gpuStatus').innerHTML = stats.gpu_available ? '✅ Disponible' : '❌ No disponible';
+        }
+
+        function addLog(message) {
+            const logContent = document.getElementById('logContent');
+            const timestamp = new Date().toLocaleTimeString();
+            logContent.innerHTML += `[${timestamp}] ${message}\n`;
+            logContent.scrollTop = logContent.scrollHeight;
+        }
+
+        // Cargar stats cada 5 segundos
+        setInterval(loadStats, 5000);
+    </script>
+</body>
+</html>
