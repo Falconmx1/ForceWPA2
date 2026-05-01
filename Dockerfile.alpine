@@ -1,0 +1,28 @@
+FROM alpine:3.19
+
+# Instalar dependencias
+RUN apk add --no-cache \
+    python3 \
+    py3-pip \
+    aircrack-ng \
+    hashcat \
+    hcxdumptool \
+    wireless-tools \
+    iw \
+    bash \
+    curl \
+    git \
+    && pip3 install --upgrade pip
+
+WORKDIR /app
+
+COPY requirements.txt .
+RUN pip3 install --no-cache-dir -r requirements.txt
+
+COPY . .
+
+RUN chmod +x *.py
+
+EXPOSE 5000
+
+CMD ["python3", "web_interface.py"]
