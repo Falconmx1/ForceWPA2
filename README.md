@@ -240,3 +240,23 @@ Método	Tiempo estimado
 CPU	~3 días
 GPU (RTX 3080)	~2 horas
 Distribuido (3 GPUs)	~40 minutos
+
+🚀 Comandos rápidos para desplegar todo
+# 1. Clonar
+git clone https://github.com/Falconmx1/ForceWPA2.git
+cd ForceWPA2
+
+# 2. Configurar notificaciones
+python3 -c "from modules.notifications import setup_notifications_interactive; setup_notifications_interactive()"
+
+# 3. Levantar con Docker (recomendado)
+docker-compose up -d
+
+# 4. Abrir interfaz web
+firefox http://localhost:5000
+
+# 5. Ejecutar tests
+python3 -m pytest tests/ -v
+
+# 6. Modo producción (con workers)
+docker-compose up --scale forcewpa2-worker=3 -d
